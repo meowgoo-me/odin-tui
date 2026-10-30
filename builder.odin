@@ -10,6 +10,10 @@ import "core:math"
 // I'm not sure how to go about attaching data, really if we just allocate more space per element we don't need an additional
 // data pointer stored at the element, but I might be missing something............ will return to it later
 
+// TODO: i think BuilderOptions should be the first argument, because
+// it's much more readable to specify the store pointer at the beginning,
+// rather than having to find the closing paren
+
 BuilderOptions :: struct {
     store : rawptr,
     size  : int,
@@ -21,7 +25,7 @@ instantiate :: proc (e : ^Element) -> ^Element {
 
 element :: proc (value : $ty, children : []^Element = nil) -> ^Element {
     e := cast(^Element)new_clone(value)
-    e.children = children == nil ? nil : slice.clone(children)
+    e.children = children == nil ? nil : slice.clone_to_dynamic(children)
     return e
 }
 
@@ -53,7 +57,7 @@ label :: proc (text : string, opt : BuilderOptions = {}) -> ^Element {
 linear :: proc (orientation : Element_Linear_Orientation, gap : Maybe(BoxType), s : LinearStretching, children : []^Element, opt : BuilderOptions = {}) -> ^Element {
     e := builder_prepare(Element_Linear_default, opt)
 
-    e.children = slice.clone(children)
+    e.children = slice.clone_to_dynamic(children)
 
     e.stretching = s
     e.gap = gap
@@ -65,7 +69,7 @@ linear :: proc (orientation : Element_Linear_Orientation, gap : Maybe(BoxType), 
 scroll :: proc (scroll : [2]bool, scrollbar : [2]bool, targetFocus : bool, child : ^Element, opt : BuilderOptions = {}) -> ^Element {
     e := builder_prepare(Element_Scroll_default, opt)
 
-    e.children = slice.clone([]^Element{ child })
+    e.children = slice.clone_to_dynamic([]^Element{ child })
 
     e.scroll = scroll
     e.scrollbar = scrollbar
@@ -77,7 +81,7 @@ scroll :: proc (scroll : [2]bool, scrollbar : [2]bool, targetFocus : bool, child
 box :: proc (border : BoxType, margin : Rect, padding : Rect, child : ^Element, opt : BuilderOptions = {}) -> ^Element {
     e := builder_prepare(Element_Box_default, opt)
 
-    e.children = slice.clone([]^Element{ child })
+    e.children = slice.clone_to_dynamic([]^Element{ child })
 
     e.border = border
     e.margin = margin
@@ -89,7 +93,7 @@ box :: proc (border : BoxType, margin : Rect, padding : Rect, child : ^Element, 
 table :: proc (size : Pos, gap : [2]Maybe(BoxType), stretching : [2]LinearStretching, children : []^Element, opt : BuilderOptions = {}) -> ^Element {
     e := builder_prepare(Element_Table_default, opt)
 
-    e.children = slice.clone(children)
+    e.children = slice.clone_to_dynamic(children)
 
     buffer, _ := buffer_create(Rect{ 0, 0, size.x, size.y }, int)
     e.configuration = buffer

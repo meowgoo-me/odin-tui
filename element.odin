@@ -76,7 +76,7 @@ Element :: struct {
     size : int,
 
     // TODO: now that i think about it this should probably be a dynamic array
-    children : []^Element,
+    children : [dynamic]^Element,
     environment : ^Environment,
 
     parent : ^Element,
@@ -235,7 +235,7 @@ element_cloneShallow :: proc (e : ^Element, allocator := context.allocator) -> ^
 
 element_clone :: proc (e : ^Element, allocator := context.allocator) -> ^Element {
     copy := element_cloneShallow(e, allocator)
-    copy.children = slice.clone(copy.children)
+    copy.children = slice.clone_to_dynamic(copy.children[:])
     copy.parent = nil
 
     for &c in copy.children {
@@ -413,7 +413,7 @@ element_getParentIndex :: proc (target : ^Element) -> int {
     if element_isRoot(target) { return 0 }
 
     // NOTE: should never return -1 if set up correctly
-    i, s := slice.linear_search(target.parent.children, target)
+    i, s := slice.linear_search(target.parent.children[:], target)
     if !s {
         panic("element_assignParentRecurse")
     }
@@ -692,7 +692,13 @@ Element_Linear_default :: Element_Linear{
 
     focus = proc (self : ^Element) {
         self := cast(^Element_Linear)self
-        element_focus(self.children[0])
+
+        if len(self.children) != 0 {
+            element_focus(self.children[0])
+        }
+        else {
+            focus_default(self)
+        }
     },
 
     unfocus = unfocus_default,
@@ -700,10 +706,6 @@ Element_Linear_default :: Element_Linear{
     navigate = proc (self : ^Element, dir : Nav) {
         self := cast(^Element_Linear)self
 
-        focus, foundFocus := element_findChildContainingFocus(self)
-        if !foundFocus { return }
-
-        i, f := slice.linear_search(self.children, focus)
 
         m := Pos{ i16(self.isHorizontal), i16(!self.isHorizontal) }
         ss := (m * Pos_from_Nav(dir))
@@ -713,6 +715,18 @@ Element_Linear_default :: Element_Linear{
             navigate_default(self, dir)
             return
         }
+
+
+        // TODO: very dirty fix, need to rethink empty containers
+        // (and nav system probably?)
+        focus, foundFocus := element_findChildContainingFocus(self)
+        if !foundFocus {
+            element_focus(self)
+        }
+        focus, foundFocus = element_findChildContainingFocus(self)
+        if !foundFocus { return }
+
+        i, f := slice.linear_search(self.children[:], focus)
 
         // TODO: optional wrapping?
         if i == 0 && s < 0 {

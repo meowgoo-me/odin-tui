@@ -114,14 +114,14 @@ env_input :: proc (env : ^Environment, input : rune) {
     for layer in env.layers {
         if !layer.focused { continue }
 
-        input_internal :: proc (e : ^Element, r : ^Element, input : rune) {
-            if e != r { e->input(input) }
+        input_all_unfocused :: proc (e : ^Element, avoid : ^Element, input : rune) {
+            if e != avoid { e->input(input) }
             for c in e.children {
-                input_internal(c, r, input)
+                input_all_unfocused(c, avoid, input)
             }
         }
 
-        input_internal(layer.root, layer.focus, input)
+        input_all_unfocused(layer.root, layer.focus, input)
 
         if layer.focus != nil {
             layer.focus->inputFocus(input)
