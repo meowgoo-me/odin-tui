@@ -49,7 +49,7 @@ builder_store :: proc (element : $ty, opt : BuilderOptions) -> ^Element {
 label :: proc (text : string, opt : BuilderOptions = {}) -> ^Element {
     e := builder_prepare(Element_Label_default, opt)
 
-    e.text = text
+    e.text = str.clone(text)
 
     return builder_store(e, opt)
 }
@@ -59,6 +59,7 @@ linear :: proc (orientation : Element_Linear_Orientation, gap : Maybe(BoxType), 
 
     e.children = slice.clone_to_dynamic(children)
 
+    // TODO: array and overrides need to be copied to current allocator
     e.stretching = s
     e.gap = gap
     e.isHorizontal = (orientation == .Horizontal)
