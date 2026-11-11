@@ -1,14 +1,9 @@
 package tui
 
 import "core:fmt"
-import px "core:sys/posix"
-import lx "core:sys/linux"
-import "core:os"
-import "core:math"
 import "core:slice"
 
 import str "core:strings"
-import utf8 "core:unicode/utf8"
 
 import "core:log"
 

@@ -1,14 +1,11 @@
 package tui
 
 import "core:slice"
-import "core:math"
+import str "core:strings"
 
 // NOTE: allocator argument removed because even if you want to specify the allocator it's
 // much more convenient to set the context allocator once instead of passing it to each
 // procedure
-
-// I'm not sure how to go about attaching data, really if we just allocate more space per element we don't need an additional
-// data pointer stored at the element, but I might be missing something............ will return to it later
 
 // TODO: i think BuilderOptions should be the first argument, because
 // it's much more readable to specify the store pointer at the beginning,
@@ -49,7 +46,17 @@ builder_store :: proc (element : $ty, opt : BuilderOptions) -> ^Element {
 label :: proc (text : string, opt : BuilderOptions = {}) -> ^Element {
     e := builder_prepare(Element_Label_default, opt)
 
+    e.text = text
+    e.textOwnership = false
+
+    return builder_store(e, opt)
+}
+
+label_owning :: proc (text : string, opt : BuilderOptions = {}) -> ^Element {
+    e := builder_prepare(Element_Label_default, opt)
+
     e.text = str.clone(text)
+    e.textOwnership = true
 
     return builder_store(e, opt)
 }

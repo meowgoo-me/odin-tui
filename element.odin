@@ -1,14 +1,10 @@
 package tui
 
 import "core:fmt"
-import px "core:sys/posix"
-import lx "core:sys/linux"
-import "core:os"
 import "core:math"
 import "core:slice"
 
 import str "core:strings"
-import utf8 "core:unicode/utf8"
 
 import "core:log"
 
@@ -75,7 +71,6 @@ Element :: struct {
     kind : string,
     size : int,
 
-    // TODO: now that i think about it this should probably be a dynamic array
     children : [dynamic]^Element,
     environment : ^Environment,
 
@@ -472,6 +467,8 @@ Element_Label :: struct {
     using core : Element,
 
     text : string,
+    textOwnership : bool,
+    disableFocusInvert : bool,
 }
 
 Element_Linear_Orientation :: enum {
@@ -494,12 +491,11 @@ Element_Scroll :: struct {
     scroll : [2]bool,
 
     // TODO: scrollbars on both sides? idk
-    // TODO: should this just be a single boolean, or is the configurability here a good thing?
     scrollbar : [2]bool,
 
     // NOTE:
-    // true  -> searches for the focused element, tries to fit it within the rendered rect
-    // false -> just changes the offset
+    // true  -> searches for focused child element, tries to fit it anywhere within the rendered rect
+    // false -> doesn't pass focus to its child, simply changes viewing offset
     targetFocus : bool,
 
 
@@ -598,7 +594,7 @@ Element_Label_default :: Element_Label{
     render = proc (self : ^Element, ctx : ^RenderingContext, rect : Rect) {
         self := cast(^Element_Label)self
 
-        if element_isFocused(self) {
+        if element_isFocused(self) && !self.disableFocusInvert {
             c_style(ctx.commandBuffer, FontStyle{ fg = FontColor_Standard.Black, bg = FontColor_Standard.White })
             cc_fill(ctx.commandBuffer, rect)
         }
