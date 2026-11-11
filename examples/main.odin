@@ -124,7 +124,7 @@ run :: proc () -> bool {
         log.debugf("magic")
 
         env := tui.element_getEnvironment(self)
-        mbox := tui.env_getComponent(env, tui.Component.MessageBox, tui.Element)
+        mbox := tui.env_getComponent(env, tui.Component.MessageBox, 0, tui.Element)
         tui.env_addLayer(env, mbox, { .Expand1, .Expand1 }, true, returnFocusTo = tui.element_getLayer(self).id)
     }
 
@@ -168,10 +168,10 @@ run :: proc () -> bool {
 
     env : tui.Environment
 
-    tui.env_addComponent(&env, tui.Component.MessageBox, textPopup)
+    tui.env_addComponent(&env, tui.Component.MessageBox, 0, textPopup)
 
     tui.env_addLayer(&env, root, { .Fill, .Fill }, true)
-    // env_addLayer(&env, textPopup, { .Expand1, .Expand1 }, true)
+    // tui.env_addLayer(&env, textPopup, { .Expand1, .Expand1 }, true)
 
 
 

@@ -46,8 +46,8 @@ Environment :: struct {
     quit : bool,
     availableLayerId : int,
 
-    components : map[u64][dynamic]^Element,
-    blueprints : map[u64][dynamic]^Element,
+    components : map[struct{ category : u64, index : u64 }]^Element,
+    blueprints : map[struct{ category : u64, index : u64 }]^Element,
 
     layers : [dynamic]EnvironmentLayer,
 }
@@ -55,48 +55,25 @@ Environment :: struct {
 
 
 
-env_addComponent :: proc (env : ^Environment, component : $ty, element : ^Element) -> int {
-    c := u64(component)
-    list, ok := &env.components[c]
 
-    if !ok {
-        env.components[c] = {}
-        list = &env.components[c]
-    }
-
-    append(list, element)
-    return len(list) - 1
+env_addComponent :: proc (env : ^Environment, component : $ty, index : $ity, element : ^Element) {
+    env.components[{ category = cast(u64)component, index = cast(u64)index }] = element
 }
 
-env_getComponent :: proc (env : ^Environment, component : $ty, $cty : typeid, index : int = 0) -> ^cty {
-    c := u64(component)
-    return cast(^cty)env.components[c][index]
+env_getComponent :: proc (env : ^Environment, component : $ty, index : $ity, $cty : typeid) -> ^cty {
+    c := env.components[{ category = cast(u64)component, index = cast(u64)index }]
+    return cast(^cty)c
 }
 
 
 
-env_setBlueprint :: proc (env : ^Environment, blueprint : $ty, element : ^Element) -> int {
-    c := u64(blueprint)
-    list, ok := &env.blueprints[c]
-
-    if !ok {
-        env.blueprints[c] = {}
-        list = &env.blueprints[c]
-    }
-
-    append(list, element)
-    return len(list) - 1
+env_setBlueprint :: proc (env : ^Environment, blueprint : $ty, index : $ity, element : ^Element) {
+    env.blueprints[{ category = cast(u64)blueprint, index = cast(u64)index }] = element
 }
 
-env_makeBlueprint :: proc (env : ^Environment, blueprint : $ty, $cty : typeid, index : int = 0) -> ^cty {
-    c := u64(blueprint)
-    bp := env.blueprints[c][index]
-
+env_blueprint :: proc (env : ^Environment, blueprint : $ty, index : $ity, $cty : typeid) -> ^cty {
+    bp := env.blueprints[{ category = cast(u64)blueprint, index = cast(u64)index }]
     return cast(^cty)element_clone(bp)
-}
-
-env_freeBlueprint :: proc (env : ^Environment, element : rawptr, blueprint : $ty, index : int = 0) {
-
 }
 
 
