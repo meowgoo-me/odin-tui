@@ -74,3 +74,7 @@ str_length :: proc (s : string) -> int {
 
     return i
 }
+
+ctx :: proc ($ty : typeid) -> ^ty {
+    return cast(^ty)context.user_ptr
+}

@@ -90,6 +90,10 @@ Element :: struct {
     event      : proc (self : ^Element, event : Event) -> (propagate : bool),
     interact   : proc (self : ^Element),
 
+    // TODO: this should probably receive an allocator?
+    clone      : proc (self : ^Element, copy : ^Element),
+    free       : proc (self : ^Element),
+
 
     // TODO: this might become a struct of style-related things
     stretch : [2]bool,
@@ -157,6 +161,31 @@ interact_default :: proc (self : ^Element) {
     return
 }
 
+clone_default :: proc (self : ^Element, copy : ^Element) {
+    return
+}
+
+free_default :: proc (self : ^Element) {
+    return
+}
+
+Element_default :: Element{
+    kind = "Element",
+    size = size_of(Element),
+
+    render = render_default,
+    negotiate = negotiate_default,
+    input = input_default,
+    inputFocus = inputFocus_default,
+    focus = focus_default,
+    unfocus = unfocus_default,
+    navigate = navigate_default,
+    event = event_default,
+    interact = interact_default,
+    clone = clone_default,
+    free = free_default,
+}
+
 
 
 
@@ -222,27 +251,38 @@ element_interact :: proc (e : ^Element) {
 
 // TODO: figure out what the fuck to do with passing/storing allocators
 
-// TODO: e->clone()
-element_cloneShallow :: proc (e : ^Element, allocator := context.allocator) -> ^Element {
+element_cloneSelf :: proc (e : ^Element, allocator := context.allocator) -> ^Element {
     copy := cast(^Element)raw_data(slice.clone(slice.bytes_from_ptr(e, e.size), allocator))
+    e->clone(copy)
     return copy
 }
 
 element_clone :: proc (e : ^Element, allocator := context.allocator) -> ^Element {
-    copy := element_cloneShallow(e, allocator)
-    copy.children = slice.clone_to_dynamic(copy.children[:])
-    copy.parent = nil
+    copy := element_cloneSelf(e, allocator)
+    copy.children = slice.clone_to_dynamic(copy.children[:], allocator)
 
     for &c in copy.children {
         c = element_clone(c, allocator)
         c.parent = copy
     }
 
+    copy.parent = nil
+
     return copy
 }
 
-element_free :: proc (e : ^Element) {
+element_freeSelf :: proc (e : ^Element, allocator := context.allocator) {
+    return
+}
 
+element_free :: proc (e : ^Element, allocator := context.allocator) {
+    for &c in e.children {
+        element_free(c, allocator)
+    }
+
+    delete(e.children)
+    element_freeSelf(e)
+    return
 }
 
 
@@ -349,10 +389,7 @@ LinearStretchingOverride :: struct {
     stretching : Stretching,
 }
 
-// The priority is the following:
-// If stretching override is available, use it
-// If not, but array element is available, use it
-// If not, use stretching
+// The first one available is chosen in this order: override -> array -> single
 LinearStretching :: struct {
     single : Stretching,
     array : []Maybe(Stretching),
@@ -451,60 +488,15 @@ element_getFullKindName :: proc (target : ^Element) -> string {
     return str.to_string(b)
 }
 
-Element_Table :: struct {
-    using core : Element,
-
-    configuration : Buffer(int),
-
-    // NOTE: gap.x - between columns, gap.y - between rows
-    gap : [2]Maybe(BoxType),
-
-    stretchingCols : LinearStretching,
-    stretchingRows : LinearStretching,
-}
-
-Element_Label :: struct {
-    using core : Element,
-
-    text : string,
-    textOwnership : bool,
-    disableFocusInvert : bool,
-}
-
 Element_Linear_Orientation :: enum {
     Vertical,
     Horizontal,
 }
 
-// TODO: we probably need to remember the last child that was focused and return to it instead of the first one
-Element_Linear :: struct {
-    using core : Element,
-
-    isHorizontal : bool,
-    gap : Maybe(BoxType),
-    stretching : LinearStretching,
-}
-
-Element_Scroll :: struct {
-    using core : Element,
-
-    scroll : [2]bool,
-
-    // TODO: scrollbars on both sides? idk
-    scrollbar : [2]bool,
-
-    // NOTE:
-    // true  -> searches for focused child element, tries to fit it anywhere within the rendered rect
-    // false -> doesn't pass focus to its child, simply changes viewing offset
-    targetFocus : bool,
 
 
 
 
-    // NOTE: RUNTIME THINGS
-    offset : Pos,
-    remaining : Pos,
-}
 
 Element_Box :: struct {
     using core : Element,
@@ -513,22 +505,6 @@ Element_Box :: struct {
     padding : Rect,
 
     border : BoxType,
-}
-
-
-Element_default :: Element{
-    kind = "Element",
-    size = size_of(Element),
-
-    render = render_default,
-    negotiate = negotiate_default,
-    input = input_default,
-    inputFocus = inputFocus_default,
-    focus = focus_default,
-    unfocus = unfocus_default,
-    navigate = navigate_default,
-    event = event_default,
-    interact = interact_default,
 }
 
 Element_Box_default :: Element_Box{
@@ -585,6 +561,19 @@ Element_Box_default :: Element_Box{
     navigate = navigate_default,
     event = event_default,
     interact = interact_default,
+    clone = clone_default,
+    free = free_default,
+}
+
+
+
+
+Element_Label :: struct {
+    using core : Element,
+
+    text : string,
+    textOwnership : bool,
+    disableFocusInvert : bool,
 }
 
 Element_Label_default :: Element_Label{
@@ -668,6 +657,35 @@ Element_Label_default :: Element_Label{
     navigate = navigate_default,
     event = event_default,
     interact = interact_default,
+
+    clone = proc (self : ^Element, copy : ^Element) {
+        self := cast(^Element_Label)self
+        copy := cast(^Element_Label)copy
+
+        if self.textOwnership {
+            copy.text = str.clone(copy.text)
+        }
+    },
+
+    free = proc (self : ^Element) {
+        self := cast(^Element_Label)self
+
+        if self.textOwnership {
+            delete(self.text)
+        }
+    }
+}
+
+
+
+
+// TODO: we probably need to remember the last child that was focused and return to it instead of the first one
+Element_Linear :: struct {
+    using core : Element,
+
+    isHorizontal : bool,
+    gap : Maybe(BoxType),
+    stretching : LinearStretching, // TODO: clone
 }
 
 // TODO: allow user to *hardcore* proportion values
@@ -739,6 +757,29 @@ Element_Linear_default :: Element_Linear{
 
     event = event_default,
     interact = interact_default,
+    clone = clone_default,
+    free = free_default,
+}
+
+
+
+Element_Scroll :: struct {
+    using core : Element,
+
+    scroll : [2]bool,
+
+    // TODO: scrollbars on both sides? idk
+    scrollbar : [2]bool,
+
+    // NOTE:
+    // true  -> searches for focused child element, tries to fit it anywhere within the rendered rect
+    // false -> doesn't pass focus to its child, simply changes viewing offset
+    targetFocus : bool,
+
+
+    // NOTE: RUNTIME THINGS
+    offset : Pos,
+    remaining : Pos,
 }
 
 Element_Scroll_default :: Element_Scroll{
@@ -911,6 +952,8 @@ Element_Scroll_default :: Element_Scroll{
     navigate = navigate_default,
     event = event_default,
     interact = interact_default,
+    clone = clone_default,
+    free = free_default,
 }
 
 linearStretching_get :: proc (l : LinearStretching, i : int) -> (s : Stretching) {
@@ -1058,6 +1101,19 @@ Element_Linear_internalRender :: proc (self : ^Element, ctx : ^RenderingContext,
 }
 
 
+Element_Table :: struct {
+    using core : Element,
+
+    configuration : Buffer(int), // TODO: clone
+
+    // NOTE: gap.x - between columns, gap.y - between rows
+    gap : [2]Maybe(BoxType),
+ 
+    // TODO: clone
+    stretchingCols : LinearStretching,
+    stretchingRows : LinearStretching,
+}
+
 Element_Table_default :: Element_Table{
     kind = "Table",
     size = size_of(Element_Table),
@@ -1109,6 +1165,8 @@ Element_Table_default :: Element_Table{
 
     event = event_default,
     interact = interact_default,
+    clone = clone_default,
+    free = free_default,
 }
 
 calculatePriority :: proc (s : Stretching, subtract : bool = false) -> u64 {
